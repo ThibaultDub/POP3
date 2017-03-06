@@ -20,10 +20,31 @@ import java.util.logging.Logger;
 public class Server {
 
     private static Socket socket;
+    private static String state;
+    private static String[] messages;
+    
+    static {
+        messages = new String[3];
+        messsages[0] = "From: John Doe <jdoe@machine.example>
+    To: Mary Smith <mary@example.net>
+    Subject: Saying Hello
+    Date: Fri, 21 Nov 1997 09:55:06 
+    -
+    0600
+    Message
+    -
+    ID: <1234@local.machine.example>
+    This is a message just to
+    say hello.
+    So, "Hello".
+    . "
+    }
     
     public static void main(String[] args) {
+        Server.state = "closed";
         initSocket();
         connect();
+        Server.state = "authorization";
         //Server Ready here
 
     }
@@ -76,13 +97,13 @@ public class Server {
             }
             switch(command[0]){
                 case("APOP") : 
-                    apop(command[1]);
+                    apop(command[1], command[2]);
                     break;
                 case("STAT") : 
                     stat();
                     break;
                 case("RETR") : 
-                    retr();
+                    retr(command[1]);
                     break;
                 case("QUIT") : 
                     quit();
@@ -96,20 +117,69 @@ public class Server {
         
     }
 
-    private static void apop() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    private static void apop(String name, String checksum) {
+        switch (Server.state){
+            case "closed":
+                break;
+                
+            case "authorization":
+                break;
+                
+            case "transaction":
+                break;
+                
+            case "update":
+                break;
+        }
+        
     }
     
      private static void stat() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+         switch (Server.state){
+            case "closed":
+                break;
+                
+            case "authorization":
+                break;
+                
+            case "transaction":
+                break;
+                
+            case "update":
+                break;
+        }
     }
 
-    private static void retr() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    private static void retr(String par) {
+        switch (Server.state){
+            case "closed":
+                break;
+                
+            case "authorization":
+                break;
+                
+            case "transaction":
+                break;
+                
+            case "update":
+                break;
+        }
     }
 
     private static void quit() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        switch (Server.state){
+            case "closed":
+                break;
+                
+            case "authorization":
+                break;
+                
+            case "transaction":
+                break;
+                
+            case "update":
+                break;
+        }
     }
 
     
