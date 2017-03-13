@@ -25,24 +25,26 @@ import java.util.logging.Logger;
  */
 public class Server {
 
+    private static ServerSocket ss;
     private static Socket socket;
     private static String state;
+    private static String userName;
 
     public static void main(String[] args) {
         Server.state = "closed";
-        initSocket();
-        connect();
-        Server.state = "authorization";
-        Server.state = "transaction";
-        process();
-
+        while (true) {       
+            initSocket();
+            connect();
+            Server.state = "authorization";
+            process();
+        }
     }
 
     public static void initSocket() {
         try {
-            ServerSocket sock = new ServerSocket(110);
+            Server.ss = new ServerSocket(110);
             System.out.println("Waiting for a client");
-            Server.socket = sock.accept();
+            Server.socket = ss.accept();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -50,10 +52,24 @@ public class Server {
 
     public static void connect() {
         if (Server.socket == null) {
-            System.out.println("Err : fail to connect");
+            System.out.println("-ERR : fail to connect");
         } else {
             System.out.println("Client found");
             write("+OK POP3 server ready");
+        }
+    }
+    
+    public static void disconnect(){
+        if (Server.socket == null) {
+            System.out.println("No connection to close");
+        }
+        else{
+            try {
+                Server.socket.close();
+                Server.ss.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
         }
     }
 
@@ -61,33 +77,73 @@ public class Server {
         String result = read();
 
         ArrayList<String> command = new ArrayList<String>(Arrays.asList(result.split(" ")));
-        if (command.size() == 1) {
-            command.add("-1");
-        }
         switch (command.get(0)) {
             case ("APOP"):
-                apop(command.get(1), command.get(2));
+                if(command.size() == 2)
+                    apop(command.get(1), null);
+                else if (command.size() == 3)
+                    apop(command.get(1), command.get(2));
+                else
+                    invalidCommand();
                 break;
             case ("STAT"):
-                stat();
-                System.out.println("on est passés dans stat");
+                if(command.size() == 1)
+                    stat();
+                else
+                    invalidCommand();
                 break;
             case ("RETR"):
-                retr(command.get(1));
+                if(command.size() == 2)
+                    retr(command.get(1));
+                else
+                    invalidCommand();
                 break;
             case ("QUIT"):
-                quit();
+                if(command.size() == 1)
+                    quit();
+                else
+                    invalidCommand();
+                return;
+            default:
+                commandNotFound();
                 break;
         }
         process();
     }
 
     private static void apop(String name, String checksum) {
+        String answer;
         switch (Server.state) {
             case "closed":
                 break;
 
             case "authorization":
+                boolean permission = false;
+                String mails;
+                if(checksum == null){
+                    mails = "";
+                    try{
+                        Server.userName = name;
+                        mails = readFile();
+                        permission = true;
+                    }
+                    catch(Exception e){
+                        permission = false;
+                    }                    
+                }else{
+                    throw new UnsupportedOperationException();
+                }
+                
+                if(permission){
+                    Server.state = "transaction";
+                    String[] splitFile = mails.split("\r\n[.]\r\n");
+                    int number = splitFile.length;
+                    answer = "+OK maildrop has " + number + (number>1?" messages":" message");
+                    write(answer);
+                }else{
+                    write("-ERR unknown user");
+                }
+                
                 break;
 
             case "transaction":
@@ -100,11 +156,16 @@ public class Server {
     }
 
     private static void stat() {
+        String answer;
         switch (Server.state) {
             case "closed":
+                answer = "-ERR : Permission Denied";
+                write(answer);
                 break;
 
             case "authorization":
+                answer = "-ERR : Permission Denied";
+                write(answer);
                 break;
 
             case "transaction":
@@ -112,7 +173,7 @@ public class Server {
                 String[] splitFile = mails.split("\r\n[.]\r\n");
                 int number = splitFile.length;
                 double size = mails.getBytes().length;
-                String answer = "+OK " + number + " " + size;
+                answer = "+OK " + number + " " + size;
                 write(answer);
                 break;
 
@@ -122,19 +183,29 @@ public class Server {
     }
 
     private static void retr(String n) {
+        String answer;
         switch (Server.state) {
             case "closed":
+                answer = "-ERR : Permission Denied";
+                write(answer);
                 break;
 
             case "authorization":
+                answer = "-ERR : Permission Denied";
+                write(answer);
                 break;
 
             case "transaction":
-                String[] splitFile = readFile().split("\r\n[.]\r\n");
-                String mail = splitFile[Integer.parseInt(n)];
-                double size = mail.getBytes().length;
-                write("+OK " + size + " octets");
-                write(mail);
+                try {
+                    String[] splitFile = readFile().split("\r\n[.]\r\n");
+                    String mail = splitFile[Integer.parseInt(n)-1];
+                    double size = mail.getBytes().length;
+                    write("+OK " + size + " octets");
+                    write(mail);
+                } catch (Exception e) {
+                    write("-ERR message "+ n +" not found.");
+                }
+                
                 break;
 
             case "update":
@@ -143,26 +214,43 @@ public class Server {
     }
 
     private static void quit() {
+        String answer;
         switch (Server.state) {
             case "closed":
                 break;
 
             case "authorization":
+                answer = "+OK "+Server.userName+" POP3 server signing off";
+                write(answer);
+                Server.userName = null;
+                Server.disconnect();
+                Server.state = "closed";
                 break;
 
             case "transaction":
+                Server.userName = null;
+                Server.disconnect();
+                Server.state = "closed";
                 break;
 
             case "update":
                 break;
         }
     }
+    
+    private static void commandNotFound() {
+        write("-ERR command not found");
+    }
+    
+    private static void invalidCommand() {
+        write("-ERR invalid command");
+    }
 
     public static String readFile() {
         BufferedReader br = null;
         String everything = "";
         try {
-            br = new BufferedReader(new FileReader("mails.conf"));
+            br = new BufferedReader(new FileReader(Server.userName + ".mail"));
             StringBuilder sb = new StringBuilder();
             String line = br.readLine();
 
