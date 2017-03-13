@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import utils.FileUtils;
+import utils.SocketUtils;
 
 /**
  *
@@ -52,10 +54,10 @@ public class Server {
 
     public static void connect() {
         if (Server.socket == null) {
-            System.out.println("-ERR : fail to connect");
+            System.out.println("Fail to connect");
         } else {
             System.out.println("Client found");
-            write("+OK POP3 server ready");
+            SocketUtils.write(Server.socket,"+OK POP3 server ready");
         }
     }
     
@@ -74,8 +76,7 @@ public class Server {
     }
 
     public static void process() {
-        String result = read();
-
+        String result = SocketUtils.read(Server.socket); 
         ArrayList<String> command = new ArrayList<String>(Arrays.asList(result.split(" ")));
         switch (command.get(0)) {
             case ("APOP"):
@@ -116,7 +117,6 @@ public class Server {
         switch (Server.state) {
             case "closed":
                 break;
-
             case "authorization":
                 boolean permission = false;
                 String mails;
@@ -124,7 +124,7 @@ public class Server {
                     mails = "";
                     try{
                         Server.userName = name;
-                        mails = readFile();
+                        mails = FileUtils.readFile(Server.userName+".mail");
                         permission = true;
                     }
                     catch(Exception e){
@@ -133,22 +133,18 @@ public class Server {
                 }else{
                     throw new UnsupportedOperationException();
                 }
-                
                 if(permission){
                     Server.state = "transaction";
                     String[] splitFile = mails.split("\r\n[.]\r\n");
                     int number = splitFile.length;
                     answer = "+OK maildrop has " + number + (number>1?" messages":" message");
-                    write(answer);
+                    SocketUtils.write(Server.socket,answer);
                 }else{
-                    write("-ERR unknown user");
+                    SocketUtils.write(Server.socket,"-ERR unknown user");
                 }
-                
                 break;
-
             case "transaction":
                 break;
-
             case "update":
                 break;
         }
@@ -160,23 +156,20 @@ public class Server {
         switch (Server.state) {
             case "closed":
                 answer = "-ERR : Permission Denied";
-                write(answer);
+                SocketUtils.write(Server.socket,answer);
                 break;
-
             case "authorization":
                 answer = "-ERR : Permission Denied";
-                write(answer);
+                SocketUtils.write(Server.socket,answer);
                 break;
-
             case "transaction":
-                String mails = readFile();
+                String mails = FileUtils.readFile(Server.userName+".mail");
                 String[] splitFile = mails.split("\r\n[.]\r\n");
                 int number = splitFile.length;
-                double size = mails.getBytes().length;
+                int size = mails.getBytes().length+2;
                 answer = "+OK " + number + " " + size;
-                write(answer);
+                SocketUtils.write(Server.socket,answer);
                 break;
-
             case "update":
                 break;
         }
@@ -187,27 +180,23 @@ public class Server {
         switch (Server.state) {
             case "closed":
                 answer = "-ERR : Permission Denied";
-                write(answer);
+                SocketUtils.write(Server.socket,answer);
                 break;
-
             case "authorization":
                 answer = "-ERR : Permission Denied";
-                write(answer);
+                SocketUtils.write(Server.socket,answer);
                 break;
-
             case "transaction":
                 try {
-                    String[] splitFile = readFile().split("\r\n[.]\r\n");
+                    String[] splitFile = FileUtils.readFile(Server.userName+".mail").split("\r\n[.]\r\n");
                     String mail = splitFile[Integer.parseInt(n)-1];
-                    double size = mail.getBytes().length;
-                    write("+OK " + size + " octets");
-                    write(mail);
+                    int size = mail.getBytes().length+2;
+                    SocketUtils.write(Server.socket,"+OK " + size + " octets");
+                    SocketUtils.write(Server.socket,mail);
                 } catch (Exception e) {
-                    write("-ERR message "+ n +" not found.");
+                    SocketUtils.write(Server.socket,"-ERR message "+ n +" not found.");
                 }
-                
                 break;
-
             case "update":
                 break;
         }
@@ -218,100 +207,28 @@ public class Server {
         switch (Server.state) {
             case "closed":
                 break;
-
             case "authorization":
                 answer = "+OK "+Server.userName+" POP3 server signing off";
-                write(answer);
+                SocketUtils.write(Server.socket,answer);
                 Server.userName = null;
                 Server.disconnect();
                 Server.state = "closed";
                 break;
-
             case "transaction":
                 Server.userName = null;
                 Server.disconnect();
                 Server.state = "closed";
                 break;
-
             case "update":
                 break;
         }
     }
     
     private static void commandNotFound() {
-        write("-ERR command not found");
+        SocketUtils.write(Server.socket,"-ERR command not found");
     }
     
     private static void invalidCommand() {
-        write("-ERR invalid command");
-    }
-
-    public static String readFile() {
-        BufferedReader br = null;
-        String everything = "";
-        try {
-            br = new BufferedReader(new FileReader(Server.userName + ".mail"));
-            StringBuilder sb = new StringBuilder();
-            String line = br.readLine();
-
-            while (line != null) {
-                sb.append(line);
-                sb.append(System.lineSeparator());
-                line = br.readLine();
-            }
-            everything = sb.toString();
-        } finally {
-            try {
-                br.close();
-            } catch (IOException ex) {
-                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            return everything;
-        }
-    }
-
-    /*
-    public static double fileSize() {
-        File file = new File("mails.conf");
-        if (file.exists()) {
-            return file.length();
-        }
-        return -1;
-    }
-    */
-
-    public static String read() {
-        try {
-            BufferedInputStream bis = new BufferedInputStream(Server.socket.getInputStream());
-            byte[] data = new byte[2048];
-            String result = "";
-            String currentChar = null;
-            String lastChar = null;
-            do {
-                lastChar = currentChar;
-                currentChar = Character.toString((char)bis.read());
-                result += currentChar;
-                data = new byte[2048];
-            }while (!(currentChar.contains("\n") && lastChar.contains("\r")));
-            result = result.substring(0,result.length()-2);
-            result = result.toUpperCase();
-            System.out.println("command: " + result);
-            return result;
-        } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-            return "";
-        }
-    }
-    
-    public static void write(String message) {
-        try {
-            OutputStream os = Server.socket.getOutputStream();
-            BufferedOutputStream bos = new BufferedOutputStream(os);
-            byte[] data = (message+"\r\n").getBytes();
-            bos.write(data);
-            bos.flush();
-        } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        SocketUtils.write(Server.socket,"-ERR invalid command");
     }
 }
