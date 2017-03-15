@@ -10,6 +10,9 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import server.Server;
@@ -27,14 +30,23 @@ public class Client {
     private static String userName;
     private static final String address = "127.0.0.1";
     private static final int port = 110;
+    private static String timestamp;
 
     public static void main(String[] args) {
         Client.state = "closed";     
         initSocket();
-        connect();
-        Client.send("APOP mary");
-        System.out.println(Client.retr(1));
-        System.out.println(Client.retr(2));
+        if(!connect()){
+           System.exit(0); 
+        }
+        try {
+            String checksum = "mary" + Arrays.toString(MessageDigest.getInstance("MD5").digest(timestamp.getBytes()));
+            Client.apop("mary", checksum);
+            //System.out.println(Client.retr(1));
+            //System.out.println(Client.retr(2));
+            Client.quit();
+        } catch (NoSuchAlgorithmException ex) {
+            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     public static void initSocket() {
@@ -45,12 +57,16 @@ public class Client {
         }
     }
 
-    public static void connect() {
-        if (Client.socket == null) {
-            System.out.println("Fail to connect");
-        } else {
-            System.out.println("Connecté au serveur POP3");
-            SocketUtils.read(Client.socket);
+    public static boolean connect() {
+        String res = SocketUtils.read(Client.socket);
+        if (res.split(" ")[0].equals("+OK")) {
+            timestamp = res.split(";")[1];
+            System.out.println("Connecté au serveur POP3.");
+            return true;
+        }
+        else{
+            System.out.println("La connexion au serveur POP3 a échoué.");
+            return false;
         }
     }
     
@@ -98,5 +114,6 @@ public class Client {
     
     public static void quit(){
         SocketUtils.write(Client.socket, "QUIT");
+        System.exit(0);
     }
 }

@@ -13,9 +13,14 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.management.ManagementFactory;
 import java.net.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import utils.FileUtils;
@@ -31,10 +36,11 @@ public class Server {
     private static Socket socket;
     private static String state;
     private static String userName;
+    private static String timestamp;
 
     public static void main(String[] args) {
         Server.state = "closed";
-        while (true) {       
+        while (true) {
             initSocket();
             connect();
             Server.state = "authorization";
@@ -57,15 +63,18 @@ public class Server {
             System.out.println("Fail to connect");
         } else {
             System.out.println("Client found");
-            SocketUtils.write(Server.socket,"+OK POP3 server ready");
+            String date = new SimpleDateFormat("dd mm yy hh:mm:ss zzz").format(new Date());
+            String pid = ManagementFactory.getRuntimeMXBean().getName().split("@")[0];
+            String hostname = Server.socket.getInetAddress().toString().split("/")[1];
+            timestamp = pid + "." + date + "@" + hostname;
+            SocketUtils.write(Server.socket, "+OK POP3 server ready;" + timestamp);
         }
     }
-    
-    public static void disconnect(){
+
+    public static void disconnect() {
         if (Server.socket == null) {
             System.out.println("No connection to close");
-        }
-        else{
+        } else {
             try {
                 Server.socket.close();
                 Server.ss.close();
@@ -76,34 +85,38 @@ public class Server {
     }
 
     public static void process() {
-        String result = SocketUtils.read(Server.socket); 
+        String result = SocketUtils.read(Server.socket);
         ArrayList<String> command = new ArrayList<String>(Arrays.asList(result.split(" ")));
         switch (command.get(0)) {
             case ("APOP"):
-                if(command.size() == 2)
+                if (command.size() == 2) {
                     apop(command.get(1), null);
-                else if (command.size() == 3)
+                } else if (command.size() == 3) {
                     apop(command.get(1), command.get(2));
-                else
+                } else {
                     invalidCommand();
+                }
                 break;
             case ("STAT"):
-                if(command.size() == 1)
+                if (command.size() == 1) {
                     stat();
-                else
+                } else {
                     invalidCommand();
+                }
                 break;
             case ("RETR"):
-                if(command.size() == 2)
+                if (command.size() == 2) {
                     retr(command.get(1));
-                else
+                } else {
                     invalidCommand();
+                }
                 break;
             case ("QUIT"):
-                if(command.size() == 1)
+                if (command.size() == 1) {
                     quit();
-                else
+                } else {
                     invalidCommand();
+                }
                 return;
             default:
                 commandNotFound();
@@ -120,27 +133,33 @@ public class Server {
             case "authorization":
                 boolean permission = false;
                 String mails;
-                if(checksum == null){
+                if (checksum == null) {
                     mails = "";
-                    try{
+                    try {
                         Server.userName = name;
-                        mails = FileUtils.readFile(Server.userName+".mail");
                         permission = true;
-                    }
-                    catch(Exception e){
+                    } catch (Exception e) {
                         permission = false;
-                    }                    
-                }else{
-                    throw new UnsupportedOperationException();
+                    }
+                } else {
+                    try {
+                        String checksumLocal = FileUtils.readFile(Server.userName + ".pass");
+                        checksumLocal += timestamp;
+                        checksumLocal = Arrays.toString(MessageDigest.getInstance("MD5").digest(checksumLocal.getBytes()));
+                        permission = checksum.equals(checksumLocal);
+                    } catch (NoSuchAlgorithmException ex) {
+                        Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                    }
                 }
-                if(permission){
+                if (permission) {
                     Server.state = "transaction";
+                    mails = FileUtils.readFile(Server.userName + ".mail");
                     String[] splitFile = mails.split("\r\n[.]\r\n");
                     int number = splitFile.length;
-                    answer = "+OK maildrop has " + number + (number>1?" messages":" message");
-                    SocketUtils.write(Server.socket,answer);
-                }else{
-                    SocketUtils.write(Server.socket,"-ERR unknown user");
+                    answer = "+OK maildrop has " + number + (number > 1 ? " messages" : " message");
+                    SocketUtils.write(Server.socket, answer);
+                } else {
+                    SocketUtils.write(Server.socket, "-ERR unknown user");
                 }
                 break;
             case "transaction":
@@ -156,19 +175,19 @@ public class Server {
         switch (Server.state) {
             case "closed":
                 answer = "-ERR : Permission Denied";
-                SocketUtils.write(Server.socket,answer);
+                SocketUtils.write(Server.socket, answer);
                 break;
             case "authorization":
                 answer = "-ERR : Permission Denied";
-                SocketUtils.write(Server.socket,answer);
+                SocketUtils.write(Server.socket, answer);
                 break;
             case "transaction":
-                String mails = FileUtils.readFile(Server.userName+".mail");
+                String mails = FileUtils.readFile(Server.userName + ".mail");
                 String[] splitFile = mails.split("\r\n[.]\r\n");
                 int number = splitFile.length;
-                int size = mails.getBytes().length+2;
+                int size = mails.getBytes().length + 2;
                 answer = "+OK " + number + " " + size;
-                SocketUtils.write(Server.socket,answer);
+                SocketUtils.write(Server.socket, answer);
                 break;
             case "update":
                 break;
@@ -180,21 +199,21 @@ public class Server {
         switch (Server.state) {
             case "closed":
                 answer = "-ERR : Permission Denied";
-                SocketUtils.write(Server.socket,answer);
+                SocketUtils.write(Server.socket, answer);
                 break;
             case "authorization":
                 answer = "-ERR : Permission Denied";
-                SocketUtils.write(Server.socket,answer);
+                SocketUtils.write(Server.socket, answer);
                 break;
             case "transaction":
                 try {
-                    String[] splitFile = FileUtils.readFile(Server.userName+".mail").split("\r\n[.]\r\n");
-                    String mail = splitFile[Integer.parseInt(n)-1];
-                    int size = mail.getBytes().length+2;
-                    SocketUtils.write(Server.socket,"+OK " + size + " octets");
-                    SocketUtils.write(Server.socket,mail);
+                    String[] splitFile = FileUtils.readFile(Server.userName + ".mail").split("\r\n[.]\r\n");
+                    String mail = splitFile[Integer.parseInt(n) - 1];
+                    int size = mail.getBytes().length + 2;
+                    SocketUtils.write(Server.socket, "+OK " + size + " octets");
+                    SocketUtils.write(Server.socket, mail);
                 } catch (Exception e) {
-                    SocketUtils.write(Server.socket,"-ERR message "+ n +" not found.");
+                    SocketUtils.write(Server.socket, "-ERR message " + n + " not found.");
                 }
                 break;
             case "update":
@@ -208,8 +227,8 @@ public class Server {
             case "closed":
                 break;
             case "authorization":
-                answer = "+OK "+Server.userName+" POP3 server signing off";
-                SocketUtils.write(Server.socket,answer);
+                answer = "+OK " + Server.userName + " POP3 server signing off";
+                SocketUtils.write(Server.socket, answer);
                 Server.userName = null;
                 Server.disconnect();
                 Server.state = "closed";
@@ -223,12 +242,14 @@ public class Server {
                 break;
         }
     }
-    
+
     private static void commandNotFound() {
-        SocketUtils.write(Server.socket,"-ERR command not found");
+        SocketUtils.write(Server.socket, "-ERR command not found");
+        System.out.println("Command not found");
     }
-    
+
     private static void invalidCommand() {
-        SocketUtils.write(Server.socket,"-ERR invalid command");
+        SocketUtils.write(Server.socket, "-ERR invalid command");
+        System.out.println("Invalid command");
     }
 }
