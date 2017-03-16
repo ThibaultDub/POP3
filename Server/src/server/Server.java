@@ -13,8 +13,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.net.*;
+import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
@@ -23,6 +25,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import utils.Console;
 import utils.FileUtils;
 import utils.SocketUtils;
 
@@ -51,7 +54,7 @@ public class Server {
     public static void initSocket() {
         try {
             Server.ss = new ServerSocket(110);
-            System.out.println("Waiting for a client");
+            Console.display("Waiting for a client");
             Server.socket = ss.accept();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
@@ -60,9 +63,9 @@ public class Server {
 
     public static void connect() {
         if (Server.socket == null) {
-            System.out.println("Fail to connect");
+            Console.display("Fail to connect");
         } else {
-            System.out.println("Client found");
+            Console.display("Client found");
             String date = new SimpleDateFormat("dd mm yy hh:mm:ss zzz").format(new Date());
             String pid = ManagementFactory.getRuntimeMXBean().getName().split("@")[0];
             String hostname = Server.socket.getInetAddress().toString().split("/")[1];
@@ -73,7 +76,7 @@ public class Server {
 
     public static void disconnect() {
         if (Server.socket == null) {
-            System.out.println("No connection to close");
+            Console.display("No connection to close");
         } else {
             try {
                 Server.socket.close();
@@ -87,6 +90,7 @@ public class Server {
     public static void process() {
         String result = SocketUtils.read(Server.socket);
         ArrayList<String> command = new ArrayList<String>(Arrays.asList(result.split(" ")));
+        Console.display("Commande reçue : '" + result + "'");
         switch (command.get(0)) {
             case ("APOP"):
                 if (command.size() == 2) {
@@ -142,13 +146,15 @@ public class Server {
                         permission = false;
                     }
                 } else {
-                    try {
-                        String checksumLocal = FileUtils.readFile(Server.userName + ".pass");
+                    Server.userName = name;
+                    try{
+                        String checksumLocal = FileUtils.readFile(Server.userName + ".pass").trim();
                         checksumLocal += timestamp;
-                        checksumLocal = Arrays.toString(MessageDigest.getInstance("MD5").digest(checksumLocal.getBytes()));
-                        permission = checksum.equals(checksumLocal);
-                    } catch (NoSuchAlgorithmException ex) {
-                        Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                        checksumLocal = SocketUtils.md5(checksumLocal);
+                        permission = checksum.trim().equals(checksumLocal.trim());
+                    }
+                    catch(Exception e){
+                        permission = false;
                     }
                 }
                 if (permission) {
@@ -159,6 +165,7 @@ public class Server {
                     answer = "+OK maildrop has " + number + (number > 1 ? " messages" : " message");
                     SocketUtils.write(Server.socket, answer);
                 } else {
+                    Server.userName = null;
                     SocketUtils.write(Server.socket, "-ERR unknown user");
                 }
                 break;
@@ -245,11 +252,11 @@ public class Server {
 
     private static void commandNotFound() {
         SocketUtils.write(Server.socket, "-ERR command not found");
-        System.out.println("Command not found");
+        Console.display("Command not found");
     }
 
     private static void invalidCommand() {
         SocketUtils.write(Server.socket, "-ERR invalid command");
-        System.out.println("Invalid command");
+        Console.display("Invalid command");
     }
 }

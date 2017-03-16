@@ -10,6 +10,9 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import server.Server;
@@ -19,6 +22,10 @@ import server.Server;
  * @author p1509019
  */
 public class SocketUtils {
+    /*private static final String STATE_CLOSED = "closed";
+    private static final String STATE_TRANSACTION = "transaction";
+    private static final String STATE_AUTHORIZATION = "authorization";*/
+    
     public static String read(Socket socket) {
         try {
             BufferedInputStream bis = new BufferedInputStream(socket.getInputStream());
@@ -68,6 +75,20 @@ public class SocketUtils {
             bos.flush();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    public static String md5(String message){
+        try {
+            byte[] digest = MessageDigest.getInstance("MD5").digest(message.getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(String.format("%02X", b));
+            } 
+            return sb.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            Logger.getLogger(SocketUtils.class.getName()).log(Level.SEVERE, null, ex);
+            return null;
         }
     }
 }
