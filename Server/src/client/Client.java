@@ -11,6 +11,7 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -34,15 +35,24 @@ public class Client {
     private static SSLSocket socket;
     private static String state;
     private static String userName;
-    private static final String address = "127.0.0.1";
+    private static String address;
     private static final int port = 58008;
     private static String timestamp;
 
     public static void main(String[] args) {
         Client.state = "closed";
-        initSecureSocket();
-        if (!connect()) {
-            System.exit(0);
+        boolean connected = false;
+        while(!connected){
+            Console.display("Saisir l'adresse de la boite :");
+            Client.address = Console.read();
+            connected = initSecureSocket();
+            if (connected) {
+                if(!connect())
+                    Console.display("La connexion a échoué.");
+            }
+            else{
+                Console.display("La connexion a échoué.");
+            }
         }
         boolean authentified = false;
         while (!authentified) {
@@ -93,15 +103,24 @@ public class Client {
         }
     }*/
     
-    public static void initSecureSocket() {
+    public static boolean initSecureSocket() {
         try {
             SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            Client.socket = (SSLSocket) factory.createSocket(Client.address, Client.port);
+            try{
+                Client.socket = (SSLSocket) factory.createSocket(Client.address, Client.port);
+            }catch(Exception e){
+                return false;
+            }
             String[] suites = Client.socket.getSupportedCipherSuites();
             Client.socket.setEnabledCipherSuites(suites);
             Client.socket.startHandshake();
-        } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+            return true;
+        }catch (IOException e1) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, e1);
+            return false;
+        }catch(Exception e2){
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, e2);
+            return false;
         }
     }
 

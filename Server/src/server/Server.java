@@ -86,6 +86,7 @@ public class Server {
         } else {
             Console.display("Client found");
             String date = new SimpleDateFormat("dd mm yy hh:mm:ss zzz").format(new Date());
+            //String date = String.valueOf(new Date().getTime());
             String pid = ManagementFactory.getRuntimeMXBean().getName().split("@")[0];
             String hostname = Server.socket.getInetAddress().toString().split("/")[1];
             timestamp = pid + "." + date + "@" + hostname;
