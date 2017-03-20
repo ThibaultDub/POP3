@@ -85,6 +85,7 @@ public class Client {
                     Console.display(retr(command));
                     break;
                 case 3:
+                    quit();
                     Console.display("Fermeture de la boite aux lettres.");
                     exit = true;
                     break;
@@ -191,6 +192,5 @@ public class Client {
 
     public static void quit() {
         SocketUtils.write(Client.socket, "QUIT");
-        System.exit(0);
     }
 }
