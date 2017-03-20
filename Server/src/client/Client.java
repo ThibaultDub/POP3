@@ -54,6 +54,7 @@ public class Client {
                 Console.display("La connexion a échoué.");
             }
         }
+        Client.state = "authorization";
         boolean authentified = false;
         while (!authentified) {
             Console.display("Nom de la boite aux lettres :");
@@ -65,6 +66,7 @@ public class Client {
                 Console.display("L'authentification a échoué.");
             }
         }
+        Client.state = "transaction";
         boolean exit = false;
         while (!exit) {
             int command = Console.displayInt("Entrer une fonctionnalité : \n"
@@ -93,6 +95,7 @@ public class Client {
             Console.display("Appuyez sur la touche 'Entrée' pour continuer.");
             Console.read();
         }
+        Client.state = "closed";
     }
 
     /*public static void initSocket() {
