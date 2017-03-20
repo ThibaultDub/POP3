@@ -17,6 +17,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import server.Server;
 import static server.Server.process;
 import utils.Console;
@@ -28,29 +30,20 @@ import utils.SocketUtils;
  */
 public class Client {
 
-    private static Socket socket;
+    //private static Socket socket;
+    private static SSLSocket socket;
     private static String state;
     private static String userName;
     private static final String address = "127.0.0.1";
-    private static final int port = 110;
+    private static final int port = 58008;
     private static String timestamp;
 
     public static void main(String[] args) {
         Client.state = "closed";
-        initSocket();
+        initSecureSocket();
         if (!connect()) {
             System.exit(0);
         }
-        /*String checksum = SocketUtils.md5("mary"+timestamp);
-        Console.display(checksum);
-        Client.apop("mary", checksum);
-        String[] statRes = Client.stat();
-        if(statRes!=null)
-            Console.display("Il y a "+statRes[0]+" messages dans la boite ("+statRes[1]+" octets).");
-        String retrRes = Client.retr(1);
-        Console.display(retrRes);
-        Console.display(Client.retr(2));
-        Client.quit();*/
         boolean authentified = false;
         while (!authentified) {
             Console.display("Nom de la boite aux lettres :");
@@ -92,9 +85,21 @@ public class Client {
         }
     }
 
-    public static void initSocket() {
+    /*public static void initSocket() {
         try {
             Client.socket = new Socket(InetAddress.getByName(Client.address), Client.port);
+        } catch (IOException ex) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }*/
+    
+    public static void initSecureSocket() {
+        try {
+            SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            Client.socket = (SSLSocket) factory.createSocket(Client.address, Client.port);
+            String[] suites = Client.socket.getSupportedCipherSuites();
+            Client.socket.setEnabledCipherSuites(suites);
+            Client.socket.startHandshake();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -158,7 +163,7 @@ public class Client {
             String message = SocketUtils.read(Client.socket, size);
             return message;
         } else {
-            return null;
+            return "Le message n'existe pas.";
         }
     }
 

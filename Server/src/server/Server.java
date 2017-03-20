@@ -25,6 +25,9 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
 import utils.Console;
 import utils.FileUtils;
 import utils.SocketUtils;
@@ -35,8 +38,10 @@ import utils.SocketUtils;
  */
 public class Server {
 
-    private static ServerSocket ss;
-    private static Socket socket;
+    //private static ServerSocket ss;
+    //private static Socket socket;
+    private static SSLServerSocket ss;
+    private static SSLSocket socket;
     private static String state;
     private static String userName;
     private static String timestamp;
@@ -44,18 +49,32 @@ public class Server {
     public static void main(String[] args) {
         Server.state = "closed";
         while (true) {
-            initSocket();
+            initSecureSocket();
             connect();
             Server.state = "authorization";
             process();
         }
     }
 
-    public static void initSocket() {
+/*    public static void initSocket() {
         try {
             Server.ss = new ServerSocket(110);
             Console.display("Waiting for a client");
             Server.socket = ss.accept();
+        } catch (IOException ex) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }*/
+    
+    public static void initSecureSocket() {
+        try {
+            SSLServerSocketFactory factory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+            Server.ss = (SSLServerSocket) factory.createServerSocket(58008);
+            String[] suites = Server.ss.getSupportedCipherSuites();
+            Server.ss.setEnabledCipherSuites(suites);
+            Console.display("Waiting for a client");
+            Server.socket = (SSLSocket) ss.accept();
+            Server.socket.startHandshake();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
