@@ -43,62 +43,78 @@ public class Client {
         Client.state = "closed";
         boolean connected = false;
         while(!connected){
-            Console.display("Saisir l'adresse de la boite :");
-            Client.address = Console.read();
-            connected = initSecureSocket();
-            if (connected) {
-                if(!connect())
-                    Console.display("La connexion a échoué.");
-            }
-            else{
-                Console.display("La connexion a échoué.");
-            }
+            connected = connection();
         }
         Client.state = "authorization";
         boolean authentified = false;
         while (!authentified) {
-            Console.display("Nom de la boite aux lettres :");
-            String login = Console.read().trim();
-            Console.display("Clef :");
-            String password = Console.read().trim();
-            authentified = Client.apop(login, SocketUtils.md5(password + timestamp));
-            if (!authentified) {
-                Console.display("L'authentification a échoué.");
-            }
+            authentified = authenticate();
         }
         Client.state = "transaction";
         boolean exit = false;
         while (!exit) {
-            int command = Console.displayInt("Entrer une fonctionnalité : \n"
-                    + "1. Nombre de mesages et taille de la boite\n"
-                    + "2. Recupérer un message\n"
-                    + "3. Quitter");
-            switch (command) {
-                case 1:
-                    String[] statRes = Client.stat();
-                    if (statRes != null) {
-                        Console.display("Il y a " + statRes[0] + " courriers dans la boite (" + statRes[1] + " octets).");
-                    }
-                    break;
-                case 2:
-                    command = Console.displayInt("Entrez le numéro du message : ");
-                    Console.display(retr(command));
-                    break;
-                case 3:
-                    quit();
-                    Console.display("Fermeture de la boite aux lettres.");
-                    exit = true;
-                    break;
-                default:
-                    Console.display("La boite aux lettres ne peut pas faire cela.");
-                    break;
-            }
-            Console.display("Appuyez sur la touche 'Entrée' pour continuer.");
-            Console.read();
+           exit = commandSelection(); 
         }
         Client.state = "closed";
     }
 
+    private static boolean connection(){
+        Console.display("Saisir l'adresse de la boite :");
+        Client.address = Console.read();
+        boolean connected = initSecureSocket();
+        if (connected) {
+            if(!connect())
+                Console.display("La connexion a échoué.");
+        }
+        else{
+            Console.display("La connexion a échoué.");
+        }
+        return connected;
+    }
+    
+    private static boolean authenticate(){
+        Console.display("Nom de la boite aux lettres :");
+        String login = Console.read().trim();
+        Console.display("Clef :");
+        String password = Console.read().trim();
+        boolean authentified = Client.apop(login, SocketUtils.md5(password + timestamp));
+        if (!authentified) {
+            Console.display("L'authentification a échoué.");
+        }
+        return authentified;
+    }
+    
+    private static boolean commandSelection(){
+        boolean exit = false;
+        int command = Console.displayInt("Entrer une fonctionnalité : \n"
+                    + "1. Nombre de mesages et taille de la boite\n"
+                    + "2. Recupérer un message\n"
+                    + "3. Quitter");
+        switch (command) {
+            case 1:
+                String[] statRes = Client.stat();
+                if (statRes != null) {
+                    Console.display("Il y a " + statRes[0] + " courriers dans la boite (" + statRes[1] + " octets).");
+                }
+                break;
+            case 2:
+                command = Console.displayInt("Entrez le numéro du message : ");
+                Console.display(retr(command));
+                break;
+            case 3:
+                quit();
+                Console.display("Fermeture de la boite aux lettres.");
+                exit = true;
+                break;
+            default:
+                Console.display("La boite aux lettres ne peut pas faire cela.");
+                break;
+        }
+        Console.display("Appuyez sur la touche 'Entrée' pour continuer.");
+        Console.read();
+        return exit;
+    }
+    
     /*public static void initSocket() {
         try {
             Client.socket = new Socket(InetAddress.getByName(Client.address), Client.port);
